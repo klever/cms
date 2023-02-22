@@ -1,13 +1,24 @@
 <template>
-    <div class="popover-container" :class="{'popover-open': isOpen}" v-on-clickaway="close" @mouseleave="leave">
+    <div :class="{'popover-open': isOpen}" v-on-clickaway="close" @mouseleave="leave">
         <div @click="toggle" ref="trigger" aria-haspopup="true" :aria-expanded="isOpen" v-if="$scopedSlots.default">
             <slot name="trigger"></slot>
         </div>
-        <div ref="popover" class="popover" v-if="!disabled">
-            <div class="popover-content bg-white shadow-popover rounded-md">
-                <slot :close="close" :after-closed="afterClosed" />
+        <portal
+            :to="portalTargetName"
+            :target-class="targetClass"
+        >
+            <div
+                ref="popover"
+                :class="`popover-container ${isOpen ? 'popover-open' : ''}`"
+                v-if="!disabled"
+            >
+                <div class="popover">
+                    <div class="popover-content bg-white shadow-popover rounded-md">
+                        <slot :close="close" :after-closed="afterClosed" />
+                    </div>
+                </div>
             </div>
-        </div>
+        </portal>
     </div>
 </template>
 
@@ -47,16 +58,36 @@ export default {
             isOpen: false,
             escBinding: null,
             popper: null,
-            closedCallbacks: []
+            closedCallbacks: [],
+            portalTarget: null,
         }
     },
 
+    computed: {
+
+        portalTargetName() {
+            return this.portalTarget ? this.portalTarget.name : null;
+        },
+
+        targetClass() {
+            return this.$vnode.data.staticClass;
+        }
+
+    },
+
+    created() {
+        this.createPortalTarget();
+    },
+
     mounted() {
-        if (! this.disabled) this.bindPopper();
+        if (! this.disabled) {
+            this.$nextTick(() => this.bindPopper());
+        }
     },
 
     beforeDestroy() {
         this.destroyPopper();
+        this.destroyPortalTarget();
     },
 
     methods: {
@@ -111,6 +142,18 @@ export default {
         afterClosed(callback) {
             this.closedCallbacks.push(callback);
         },
+
+        createPortalTarget() {
+            let key = `popover-${this._uid}`;
+            let portalTarget = { key, name: key };
+            this.$root.portals.push(portalTarget);
+            this.portalTarget = portalTarget;
+        },
+
+        destroyPortalTarget() {
+            const i = _.findIndex(this.$root.portals, (portal) => portal.key === this.portalTarget.key);
+            this.$root.portals.splice(i, 1);
+        }
     }
 }
 </script>
